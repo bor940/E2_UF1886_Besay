@@ -1,4 +1,4 @@
-﻿secrets:
+secrets:
   postgres_password:
     file: ./secrets/dev/postgres_password
   odoo_admin_password:
@@ -34,6 +34,8 @@ services:
       POSTGRES_DB: odoo_dev
       POSTGRES_USER: odoo_dev
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    ports:
+      - "5432:5432"
     secrets:
       - postgres_password
     volumes:
