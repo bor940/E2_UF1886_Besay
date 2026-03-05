@@ -1,0 +1,65 @@
+﻿secrets:
+  postgres_password:
+    file: ./secrets/prod/postgres_password
+  odoo_admin_password:
+    file: ./secrets/prod/odoo_admin_password
+
+services:
+  odoo:
+    image: odoo:18.0
+    container_name: odoo-prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8071:8069"
+    secrets:
+      - postgres_password
+      - odoo_admin_password
+    volumes:
+      - odoo-data-prod:/var/lib/odoo
+      - ./config/prod/odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./addons/prod:/mnt/extra-addons:ro
+      - ./scripts/entrypoint.sh:/entrypoint-custom.sh:ro
+    entrypoint: ["/bin/bash", "/entrypoint-custom.sh"]
+    networks:
+      - odoo-net-prod
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: odoo_prod
+      POSTGRES_USER: odoo_prod
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres-data-prod:/var/lib/postgresql/data
+    networks:
+      - odoo-net-prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo_prod -d odoo_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hop:
+    image: apache/hop:latest
+    container_name: hop-prod
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./hop/prod:/files
+    networks:
+      - odoo-net-prod
+
+volumes:
+  odoo-data-prod:
+  postgres-data-prod:
+
+networks:
+  odoo-net-prod:

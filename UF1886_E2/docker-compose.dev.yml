@@ -1,0 +1,65 @@
+﻿secrets:
+  postgres_password:
+    file: ./secrets/dev/postgres_password
+  odoo_admin_password:
+    file: ./secrets/dev/odoo_admin_password
+
+services:
+  odoo:
+    image: odoo:18.0
+    container_name: odoo-dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8069:8069"
+    secrets:
+      - postgres_password
+      - odoo_admin_password
+    volumes:
+      - odoo-data-dev:/var/lib/odoo
+      - ./config/dev/odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./addons/dev:/mnt/extra-addons:ro
+      - ./scripts/entrypoint.sh:/entrypoint-custom.sh:ro
+    entrypoint: ["/bin/bash", "/entrypoint-custom.sh"]
+    networks:
+      - odoo-net-dev
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: odoo_dev
+      POSTGRES_USER: odoo_dev
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres-data-dev:/var/lib/postgresql/data
+    networks:
+      - odoo-net-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo_dev -d odoo_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hop:
+    image: apache/hop:latest
+    container_name: hop-dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./hop/dev:/files
+    networks:
+      - odoo-net-dev
+
+volumes:
+  odoo-data-dev:
+  postgres-data-dev:
+
+networks:
+  odoo-net-dev:

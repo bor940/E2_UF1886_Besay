@@ -1,0 +1,65 @@
+﻿secrets:
+  postgres_password:
+    file: ./secrets/qa/postgres_password
+  odoo_admin_password:
+    file: ./secrets/qa/odoo_admin_password
+
+services:
+  odoo:
+    image: odoo:18.0
+    container_name: odoo-qa
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8070:8069"
+    secrets:
+      - postgres_password
+      - odoo_admin_password
+    volumes:
+      - odoo-data-qa:/var/lib/odoo
+      - ./config/qa/odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./addons/qa:/mnt/extra-addons:ro
+      - ./scripts/entrypoint.sh:/entrypoint-custom.sh:ro
+    entrypoint: ["/bin/bash", "/entrypoint-custom.sh"]
+    networks:
+      - odoo-net-qa
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres-qa
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: odoo_qa
+      POSTGRES_USER: odoo_qa
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres-data-qa:/var/lib/postgresql/data
+    networks:
+      - odoo-net-qa
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo_qa -d odoo_qa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  hop:
+    image: apache/hop:latest
+    container_name: hop-qa
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./hop/qa:/files
+    networks:
+      - odoo-net-qa
+
+volumes:
+  odoo-data-qa:
+  postgres-data-qa:
+
+networks:
+  odoo-net-qa:
